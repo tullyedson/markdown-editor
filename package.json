@@ -1,0 +1,58 @@
+{
+  "name": "markdown-editor",
+  "version": "1.0.0",
+  "description": "A desktop markdown file viewer built with Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "package": "electron-packager . MarkdownEditor --platform=win32 --arch=x64 --out=final --overwrite"
+  },
+  "keywords": [
+    "markdown",
+    "editor",
+    "viewer",
+    "electron",
+    "desktop"
+  ],
+  "author": "Markdown Editor",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "marked": "^9.1.2"
+  },
+  "build": {
+    "appId": "com.markdowneditor.app",
+    "productName": "Markdown Editor",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "dir"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": "dmg"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

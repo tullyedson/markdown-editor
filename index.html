@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown Editor</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="node_modules/highlight.js/styles/github.css">
+</head>
+<body>
+    <div class="app-container">
+
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Split View Container -->
+            <div id="split-container" class="split-container">
+                <!-- Left Panel - Editor -->
+                <div id="editor-panel" class="editor-panel">
+                    <div class="editor-toolbar">
+                        <button id="new-file-btn" class="btn btn-secondary" title="New File (Ctrl+N)">
+                            <span class="btn-icon">📄</span>
+                        </button>
+                        <button id="open-file-btn" class="btn btn-secondary" title="Open File (Ctrl+O)">
+                            <span class="btn-icon">📁</span>
+                        </button>
+                        <button id="save-file-btn" class="btn btn-secondary" title="Save File (Ctrl+S)">
+                            <span class="btn-icon">💾</span>
+                        </button>
+                        <button id="save-as-btn" class="btn btn-secondary" title="Save As (Ctrl+Shift+S)">
+                            <span class="btn-icon">💾+</span>
+                        </button>
+                        <div class="toolbar-separator"></div>
+                        <span class="editor-label">Editor</span>
+                    </div>
+                    <textarea id="markdown-editor" class="markdown-editor" placeholder="Start typing your markdown here...
+
+# Welcome to Markdown Editor
+
+This is a **live preview** markdown editor. Type in this panel and see the rendered output on the right.
+
+## Features
+- Live preview
+- Syntax highlighting
+- File operations (New, Open, Save, Save As)
+- Resizable panels
+
+Start editing to see the magic happen!"></textarea>
+                </div>
+
+                <!-- Splitter -->
+                <div id="splitter" class="splitter"></div>
+
+                <!-- Right Panel - Preview -->
+                <div id="preview-panel" class="preview-panel">
+                    <div class="preview-toolbar">
+                        <span class="preview-label">Preview</span>
+                        <div class="toolbar-separator"></div>
+                        <button id="zoom-out-btn" class="btn btn-secondary" title="Zoom Out">
+                            <span class="btn-icon">🔍-</span>
+                        </button>
+                        <button id="zoom-reset-btn" class="btn btn-secondary" title="Reset Zoom">
+                            <span class="btn-icon">🔍</span>
+                        </button>
+                        <button id="zoom-in-btn" class="btn btn-secondary" title="Zoom In">
+                            <span class="btn-icon">🔍+</span>
+                        </button>
+                    </div>
+                    <div id="markdown-content" class="markdown-content">
+                        <!-- Rendered markdown will appear here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <span class="footer-text">Ready</span>
+                <span id="word-count" class="word-count"></span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Loading markdown file...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="node_modules/marked/marked.min.js"></script>
+    <script src="node_modules/highlight.js/lib/index.js"></script>
+    <script src="renderer.js"></script>
+</body>
+</html>

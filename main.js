@@ -6,7 +6,6 @@ let mainWindow;
 let fileToOpen = null;
 
 function createWindow() {
-  // Create the browser window
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -15,15 +14,14 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon: path.join(__dirname, 'assets/icon.png'),
-    show: false
+    icon: path.join(__dirname, 'assets/icon.png')
   });
 
   // Load the app
   mainWindow.loadFile('index.html');
 
-  // Show window when ready to prevent visual flash
-  mainWindow.once('ready-to-show', () => {
+  // Show the window when the content is fully loaded
+  mainWindow.webContents.on('did-finish-load', () => {
     mainWindow.show();
 
     // If there's a file to open (from command line or file association), open it
@@ -108,7 +106,7 @@ function createMenu() {
         },
         {
           label: 'Toggle Developer Tools',
-          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          accelerator: 'Ctrl+Shift+I',
           click: () => {
             mainWindow.webContents.toggleDevTools();
           }

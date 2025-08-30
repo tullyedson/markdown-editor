@@ -27,10 +27,20 @@ let currentFileContent = null;
 let zoomLevel = 1;
 let isModified = false;
 let isDragging = false;
+let contentLoaded = false;
 
 // Configure marked options
 marked.setOptions({
     highlight: function(code, lang) {
+        // Debug output
+        console.log('Highlight function called with lang:', lang);
+        console.log('hljs available:', typeof hljs !== 'undefined');
+        
+        if (typeof hljs === 'undefined') {
+            console.warn('highlight.js not available, returning plain code');
+            return '';
+        }
+        
         if (lang && hljs.getLanguage(lang)) {
             try {
                 return hljs.highlight(code, { language: lang }).value;
@@ -38,7 +48,12 @@ marked.setOptions({
                 console.error('Highlight.js error:', err);
             }
         }
-        return hljs.highlightAuto(code).value;
+        try {
+            return hljs.highlightAuto(code).value;
+        } catch (err) {
+            console.error('Highlight.js auto-detection error:', err);
+            return '';
+        }
     },
     breaks: true,
     gfm: true,
@@ -48,10 +63,22 @@ marked.setOptions({
 
 // Initialize the application
 function init() {
+    console.log('Initializing application...');
+    console.log('hljs available at init:', typeof hljs !== 'undefined');
+    console.log('marked available at init:', typeof marked !== 'undefined');
+
+    // Ensure all dependencies are loaded before proceeding
+    if (typeof marked === 'undefined') {
+        console.warn('marked.js not loaded yet, retrying...');
+        setTimeout(init, 50);
+        return;
+    }
+
     setupEventListeners();
     setupSplitter();
-    // Start with default content
-    updatePreview();
+
+    // Don't update preview yet - wait for content to be loaded by createNewFile()
+    // updatePreview() will be called after the editor content is set
 }
 
 // Set up event listeners
@@ -147,7 +174,11 @@ function createNewFile() {
     currentFilePath = null;
     currentFileContent = '';
     markdownEditor.value = markdownEditor.placeholder;
+
+    // Always update preview when creating new file
     updatePreview();
+    contentLoaded = true;
+
     updateFileInfo('Untitled.md', null);
     setModified(false);
     markdownEditor.focus();
@@ -161,6 +192,7 @@ function handleEditorInput() {
 
 // Update preview
 function updatePreview() {
+    console.log('Updating preview...');
     const content = markdownEditor.value;
     renderMarkdown(content);
     updateWordCount(content);
@@ -177,15 +209,25 @@ function setModified(modified) {
 
 // Render markdown content
 function renderMarkdown(content) {
+    console.log('Rendering markdown...');
     try {
         const html = marked.parse(content);
         markdownContent.innerHTML = html;
 
         // Apply syntax highlighting to code blocks if hljs is available
-        if (typeof hljs !== 'undefined' && hljs.highlightElement) {
+        console.log('Applying syntax highlighting, hljs available:', typeof hljs !== 'undefined');
+        if (typeof hljs !== 'undefined') {
             markdownContent.querySelectorAll('pre code').forEach((block) => {
                 try {
-                    hljs.highlightElement(block);
+                    // Get the language from the class name
+                    const language = block.className.match(/language-(\w+)/);
+                    if (language && hljs.getLanguage(language[1])) {
+                        const result = hljs.highlight(block.textContent, { language: language[1] });
+                        block.innerHTML = result.value;
+                    } else {
+                        const result = hljs.highlightAuto(block.textContent);
+                        block.innerHTML = result.value;
+                    }
                 } catch (highlightError) {
                     console.warn('Syntax highlighting failed for block:', highlightError);
                 }
@@ -246,8 +288,10 @@ async function saveFileAs() {
 
 // Update file information display
 function updateFileInfo(filename, filepath) {
-    currentFileSpan.textContent = filename;
-    currentFileSpan.title = filepath;
+    if (currentFileSpan) {
+        currentFileSpan.textContent = filename;
+        currentFileSpan.title = filepath;
+    }
 }
 
 // Setup splitter functionality
@@ -338,7 +382,7 @@ function updateWordCount(content) {
     const plainText = content
         .replace(/```[\s\S]*?```/g, '') // Remove code blocks
         .replace(/`[^`]*`/g, '') // Remove inline code
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1') // Replace links with text
+        .replace(/\[([^\]]*)\]\(([^)]*)\)/g, '$1') // Replace links with text
         .replace(/[#*_~`]/g, '') // Remove markdown formatting
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
@@ -403,5 +447,4 @@ window.addEventListener('unhandledrejection', (e) => {
     console.error('Unhandled promise rejection:', e.reason);
 });
 
-// Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', init);

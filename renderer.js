@@ -7,7 +7,7 @@ const editorPanel = document.getElementById('editor-panel');
 const previewPanel = document.getElementById('preview-panel');
 const splitter = document.getElementById('splitter');
 const markdownEditor = document.getElementById('markdown-editor');
-const markdownContent = document.getElementById('markdown-content');
+const wysiwygContainer = document.getElementById('wysiwyg-editor');
 const currentFileSpan = document.getElementById('current-file');
 
 // Toolbar buttons
@@ -18,6 +18,9 @@ const saveAsBtn = document.getElementById('save-as-btn');
 const zoomInBtn = document.getElementById('zoom-in-btn');
 const zoomOutBtn = document.getElementById('zoom-out-btn');
 const zoomResetBtn = document.getElementById('zoom-reset-btn');
+const toggleMarkdownBtn = document.getElementById('toggle-markdown');
+const syncToWysiwygBtn = document.getElementById('sync-to-wysiwyg');
+const syncToMarkdownBtn = document.getElementById('sync-to-markdown');
 const loadingOverlay = document.getElementById('loading-overlay');
 const wordCountSpan = document.getElementById('word-count');
 
@@ -28,6 +31,10 @@ let zoomLevel = 1;
 let isModified = false;
 let isDragging = false;
 let contentLoaded = false;
+let quillEditor = null;
+let turndownService = null;
+let isUpdatingFromMarkdown = false;
+let isUpdatingFromWysiwyg = false;
 
 // Configure marked options
 marked.setOptions({
@@ -76,6 +83,7 @@ function init() {
 
     setupEventListeners();
     setupSplitter();
+    initializeWysiwygEditor();
 
     // Don't update preview yet - wait for content to be loaded by createNewFile()
     // updatePreview() will be called after the editor content is set
@@ -100,9 +108,15 @@ function setupEventListeners() {
     zoomOutBtn.addEventListener('click', () => adjustZoom(-0.1));
     zoomResetBtn.addEventListener('click', resetZoom);
 
+    // WYSIWYG controls
+    toggleMarkdownBtn.addEventListener('click', toggleMarkdownPanel);
+    syncToWysiwygBtn.addEventListener('click', syncMarkdownToWysiwyg);
+    syncToMarkdownBtn.addEventListener('click', syncWysiwygToMarkdown);
+
     // IPC listeners
     ipcRenderer.on('file-opened', handleFileOpened);
     ipcRenderer.on('new-file', createNewFile);
+    ipcRenderer.on('new-blank-file', createBlankFile);
     ipcRenderer.on('save-file', saveFile);
     ipcRenderer.on('save-file-as', saveFileAs);
 
@@ -179,6 +193,13 @@ function createNewFile() {
     updatePreview();
     contentLoaded = true;
 
+    // Ensure WYSIWYG is synced after content is set
+    setTimeout(() => {
+        if (quillEditor) {
+            syncMarkdownToWysiwyg();
+        }
+    }, 100);
+
     updateFileInfo('Untitled.md', null);
     setModified(false);
     markdownEditor.focus();
@@ -186,8 +207,10 @@ function createNewFile() {
 
 // Handle editor input
 function handleEditorInput() {
-    updatePreview();
-    setModified(true);
+    if (!isUpdatingFromWysiwyg) {
+        updatePreview();
+        setModified(true);
+    }
 }
 
 // Update preview
@@ -196,6 +219,11 @@ function updatePreview() {
     const content = markdownEditor.value;
     renderMarkdown(content);
     updateWordCount(content);
+
+    // Also sync to WYSIWYG editor if it's initialized
+    if (quillEditor && !isUpdatingFromWysiwyg) {
+        syncMarkdownToWysiwyg();
+    }
 }
 
 // Set modified state
@@ -207,48 +235,11 @@ function setModified(modified) {
     document.title = title;
 }
 
-// Render markdown content
+// Render markdown content (now handled by WYSIWYG editor)
 function renderMarkdown(content) {
-    console.log('Rendering markdown...');
-    try {
-        const html = marked.parse(content);
-        markdownContent.innerHTML = html;
-
-        // Apply syntax highlighting to code blocks if hljs is available
-        console.log('Applying syntax highlighting, hljs available:', typeof hljs !== 'undefined');
-        if (typeof hljs !== 'undefined') {
-            markdownContent.querySelectorAll('pre code').forEach((block) => {
-                try {
-                    // Get the language from the class name
-                    const language = block.className.match(/language-(\w+)/);
-                    if (language && hljs.getLanguage(language[1])) {
-                        const result = hljs.highlight(block.textContent, { language: language[1] });
-                        block.innerHTML = result.value;
-                    } else {
-                        const result = hljs.highlightAuto(block.textContent);
-                        block.innerHTML = result.value;
-                    }
-                } catch (highlightError) {
-                    console.warn('Syntax highlighting failed for block:', highlightError);
-                }
-            });
-        } else {
-            console.warn('highlight.js not available, skipping syntax highlighting');
-        }
-
-        // Scroll to top
-        markdownContent.scrollTop = 0;
-
-    } catch (error) {
-        console.error('Error rendering markdown:', error);
-        markdownContent.innerHTML = `
-            <div style="color: #dc3545; padding: 20px; background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
-                <h3>Error rendering markdown</h3>
-                <p>${error.message}</p>
-                <pre style="background-color: #ffffff; padding: 10px; margin-top: 10px; border-radius: 4px;">${escapeHtml(content)}</pre>
-            </div>
-        `;
-    }
+    console.log('Rendering markdown... (handled by WYSIWYG editor)');
+    // The WYSIWYG editor now handles the rendering
+    // This function is kept for compatibility but doesn't do the old HTML rendering
 }
 
 // Save file
@@ -446,5 +437,210 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => {
     console.error('Unhandled promise rejection:', e.reason);
 });
+
+// Initialize WYSIWYG Editor
+function initializeWysiwygEditor() {
+    console.log('Initializing WYSIWYG editor...');
+
+    // Initialize Turndown service for HTML to Markdown conversion
+    turndownService = new TurndownService({
+        headingStyle: 'atx',
+        codeBlockStyle: 'fenced'
+    });
+
+    // Initialize Quill editor
+    quillEditor = new Quill('#wysiwyg-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: {
+                container: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    ['blockquote', 'code-block'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['link', 'image'],
+                    ['clean']
+                ],
+                handlers: {
+                    'image': function() {
+                        const range = this.quill.getSelection();
+                        const input = document.createElement('input');
+                        input.setAttribute('type', 'file');
+                        input.setAttribute('accept', 'image/*');
+                        input.click();
+
+                        input.onchange = () => {
+                            const file = input.files[0];
+                            if (file) {
+                                const reader = new FileReader();
+                                reader.onload = (e) => {
+                                    const imageUrl = e.target.result;
+                                    this.quill.insertEmbed(range.index, 'image', imageUrl, 'user');
+                                };
+                                reader.readAsDataURL(file);
+                            }
+                        };
+                    }
+                }
+            }
+        },
+        placeholder: 'Start editing in WYSIWYG mode...'
+    });
+
+    // Add tooltips to toolbar buttons
+    setTimeout(() => {
+        addToolbarTooltips();
+    }, 100);
+
+    // Listen for changes in the WYSIWYG editor
+    quillEditor.on('text-change', function(delta, oldDelta, source) {
+        if (source === 'user' && !isUpdatingFromMarkdown) {
+            isUpdatingFromWysiwyg = true;
+            syncWysiwygToMarkdown();
+            setModified(true);
+            setTimeout(() => {
+                isUpdatingFromWysiwyg = false;
+            }, 100);
+        }
+    });
+
+    console.log('WYSIWYG editor initialized');
+
+    // Initial sync after a brief delay to ensure everything is ready
+    setTimeout(() => {
+        if (markdownEditor.value) {
+            console.log('Performing initial sync to WYSIWYG...');
+            syncMarkdownToWysiwyg();
+        }
+    }, 200);
+}
+
+// Sync markdown content to WYSIWYG editor
+function syncMarkdownToWysiwyg() {
+    if (!quillEditor || isUpdatingFromWysiwyg) return;
+
+    console.log('Syncing markdown to WYSIWYG...');
+    isUpdatingFromMarkdown = true;
+
+    try {
+        const markdownText = markdownEditor.value;
+        console.log('Markdown content to sync:', markdownText);
+        const html = marked.parse(markdownText);
+        console.log('Generated HTML:', html);
+
+        // Use Quill's clipboard API for better HTML insertion
+        const delta = quillEditor.clipboard.convert(html);
+        quillEditor.setContents(delta, 'silent');
+
+        console.log('WYSIWYG editor updated');
+    } catch (error) {
+        console.error('Error syncing markdown to WYSIWYG:', error);
+    }
+
+    setTimeout(() => {
+        isUpdatingFromMarkdown = false;
+    }, 100);
+}
+
+// Sync WYSIWYG content to markdown
+function syncWysiwygToMarkdown() {
+    if (!quillEditor || !turndownService || isUpdatingFromMarkdown) return;
+
+    console.log('Syncing WYSIWYG to markdown...');
+    isUpdatingFromWysiwyg = true;
+
+    try {
+        const html = quillEditor.root.innerHTML;
+        const markdown = turndownService.turndown(html);
+        markdownEditor.value = markdown;
+        updateWordCount(markdown);
+    } catch (error) {
+        console.error('Error syncing WYSIWYG to markdown:', error);
+    }
+
+    setTimeout(() => {
+        isUpdatingFromWysiwyg = false;
+    }, 100);
+}
+
+// Toggle markdown panel visibility
+function toggleMarkdownPanel() {
+    const editorPanel = document.getElementById('editor-panel');
+    const previewPanel = document.getElementById('preview-panel');
+    const splitter = document.getElementById('splitter');
+
+    if (editorPanel.classList.contains('visible')) {
+        // Hide markdown panel
+        editorPanel.classList.remove('visible');
+        previewPanel.classList.remove('split');
+        splitter.style.display = 'none';
+        syncToWysiwygBtn.style.display = 'none';
+        syncToMarkdownBtn.style.display = 'none';
+        toggleMarkdownBtn.title = 'Show Markdown Panel';
+    } else {
+        // Show markdown panel
+        editorPanel.classList.add('visible');
+        previewPanel.classList.add('split');
+        splitter.style.display = 'block';
+        syncToWysiwygBtn.style.display = 'inline-block';
+        syncToMarkdownBtn.style.display = 'inline-block';
+        toggleMarkdownBtn.title = 'Hide Markdown Panel';
+
+        // Sync content when showing markdown panel
+        syncWysiwygToMarkdown();
+    }
+}
+
+// Create blank file (no placeholder content)
+function createBlankFile() {
+    if (isModified) {
+        const result = confirm('You have unsaved changes. Are you sure you want to create a new file?');
+        if (!result) return;
+    }
+
+    currentFilePath = null;
+    currentFileContent = '';
+    markdownEditor.value = '';
+
+    // Clear WYSIWYG editor
+    if (quillEditor) {
+        quillEditor.setContents([]);
+    }
+
+    updateFileInfo('Untitled.md', null);
+    setModified(false);
+    markdownEditor.focus();
+}
+
+// Add tooltips to Quill toolbar
+function addToolbarTooltips() {
+    const toolbar = document.querySelector('.ql-toolbar');
+    if (!toolbar) return;
+
+    const tooltips = {
+        '.ql-header[value="1"]': 'Heading 1',
+        '.ql-header[value="2"]': 'Heading 2',
+        '.ql-header[value="3"]': 'Heading 3',
+        '.ql-header[value="false"]': 'Normal text',
+        '.ql-bold': 'Bold',
+        '.ql-italic': 'Italic',
+        '.ql-underline': 'Underline',
+        '.ql-strike': 'Strikethrough',
+        '.ql-blockquote': 'Quote',
+        '.ql-code-block': 'Code block',
+        '.ql-list[value="ordered"]': 'Numbered list',
+        '.ql-list[value="bullet"]': 'Bullet list',
+        '.ql-link': 'Insert link',
+        '.ql-image': 'Insert image',
+        '.ql-clean': 'Remove formatting'
+    };
+
+    Object.entries(tooltips).forEach(([selector, tooltip]) => {
+        const element = toolbar.querySelector(selector);
+        if (element) {
+            element.title = tooltip;
+        }
+    });
+}
 
 document.addEventListener('DOMContentLoaded', init);

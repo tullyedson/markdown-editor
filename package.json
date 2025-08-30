@@ -7,8 +7,16 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build:all": "electron-builder --win --mac --linux",
     "dist": "electron-builder --publish=never",
-    "package": "electron-packager . MarkdownEditor --platform=win32 --arch=x64 --out=final --overwrite"
+    "package": "electron-packager . MarkdownEditor --platform=win32 --arch=x64 --out=final --overwrite",
+    "package:win": "electron-packager . MarkdownEditor --platform=win32 --arch=x64 --out=packages --overwrite",
+    "package:mac": "electron-packager . MarkdownEditor --platform=darwin --arch=x64 --out=packages --overwrite",
+    "package:linux": "electron-packager . MarkdownEditor --platform=linux --arch=x64 --out=packages --overwrite",
+    "package:all": "npm run package:win && npm run package:mac && npm run package:linux"
   },
   "keywords": [
     "markdown",
@@ -32,27 +40,69 @@
     "appId": "com.markdowneditor.app",
     "productName": "Markdown Editor",
     "directories": {
-      "output": "release"
+      "output": "dist"
     },
     "files": [
       "main.js",
       "renderer.js",
       "index.html",
-      "styles.css",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "!node_modules/.cache",
+      "!node_modules/electron-builder",
+      "!node_modules/electron-packager"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["**/*"]
+      }
     ],
     "win": {
-      "target": "dir"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "sign": false
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Markdown Editor"
     },
     "mac": {
-      "target": "dmg"
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.productivity"
     },
     "linux": {
-      "target": "AppImage"
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Office"
     }
   }
 }

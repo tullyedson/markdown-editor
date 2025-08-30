@@ -128,9 +128,25 @@ build/
 release/
 final/
 dist/
+packages/
 
 # Electron-builder output
 app-builds/
+
+# Electron specific files
+*.asar
+*.exe
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+*.snap
+
+# Code signing certificates
+*.p12
+*.cer
+*.crt
+*.pem
 
 # macOS
 .DS_Store
@@ -211,3 +227,31 @@ $RECYCLE.BIN/
 test-*.md
 temp-*.md
 draft-*.md
+
+# User data and temporary files
+user-data/
+temp/
+tmp/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Cache directories
+.cache/
+.tmp/
+
+# Test and coverage reports
+test-results/
+playwright-report/
+coverage/
+
+# Auto-generated documentation
+docs/generated/
+
+# Application logs
+app.log
+error.log
+debug.log

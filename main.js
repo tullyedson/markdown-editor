@@ -29,8 +29,8 @@ function createWindow() {
       openFileFromPath(fileToOpen);
       fileToOpen = null;
     } else {
-      // Create new blank file
-      mainWindow.webContents.send('new-file');
+      // Start with blank document
+      mainWindow.webContents.send('new-blank-file');
     }
   });
 
@@ -39,8 +39,15 @@ function createWindow() {
     mainWindow.webContents.openDevTools();
   }
 
+  // Handle window close attempt
+  mainWindow.on('close', (event) => {
+    // Allow the window to close normally
+    console.log('Window close requested');
+  });
+
   // Handle window closed
   mainWindow.on('closed', () => {
+    console.log('Window closed');
     mainWindow = null;
   });
 
